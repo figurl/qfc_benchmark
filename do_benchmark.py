@@ -1,4 +1,4 @@
-from typing import List, Tuple
+from typing import List, Tuple, Union
 import time
 import json
 import numpy as np
@@ -49,6 +49,29 @@ def apply_bandpass_filter(
     low = lowcut / nyquist
     high = highcut / nyquist
     b, a = butter(5, [low, high], btype="band")
+    result = lfilter(b, a, array, axis=0)
+    # lfilter can return either ndarray or tuple of ndarrays
+    # In our case, we know it returns ndarray since we're filtering
+    return cast(NDArray[Any], result).astype(array.dtype)
+
+
+def apply_highpass_filter(
+    array: NDArray[Any], sampling_frequency: float, lowcut: float
+) -> NDArray[Any]:
+    """
+    Apply a highpass filter to a signal array.
+
+    Args:
+        array: Input signal array
+        sampling_frequency: Sampling frequency in Hz
+        lowcut: Lower cutoff frequency in Hz
+
+    Returns:
+        Filtered signal array
+    """
+    nyquist = 0.5 * sampling_frequency
+    low = lowcut / nyquist
+    b, a = butter(5, low, btype="high")
     result = lfilter(b, a, array, axis=0)
     # lfilter can return either ndarray or tuple of ndarrays
     # In our case, we know it returns ndarray since we're filtering
@@ -156,28 +179,31 @@ def open_zarr(uri: str, *, mode: str):
         return zarr.open(uri, mode=mode)
 
 
-def get_filtered_path(lowcut: float, highcut: float) -> str:
+def get_filtered_path(lowcut: float, highcut: Union[float, None]) -> str:
     """
     Generate path for filtered data based on filter parameters.
 
     Args:
         lowcut: Lower cutoff frequency in Hz
-        highcut: Upper cutoff frequency in Hz
+        highcut: Upper cutoff frequency in Hz or None for highpass
 
     Returns:
         Path string for filtered data
     """
-    return f"filtered_{lowcut}-{highcut}"
+    if highcut is None:
+        return f"filtered_{lowcut}"
+    else:
+        return f"filtered_{lowcut}-{highcut}"
 
 
-def do_filter(*, zarr_path: str, lowcut: float = 300, highcut: float = 6000):
+def do_filter(*, zarr_path: str, lowcut: float, highcut: Union[float, None]):
     """
-    Apply bandpass filter to raw data and save filtered result.
+    Apply bandpass filter or highpass to raw data and save filtered result.
 
     Args:
         zarr_path: Path to zarr archive
         lowcut: Lower cutoff frequency in Hz
-        highcut: Upper cutoff frequency in Hz
+        highcut: Upper cutoff frequency in Hz or None for highpass
     """
     filtered_path = get_filtered_path(lowcut=lowcut, highcut=highcut)
     z = open_zarr(zarr_path, mode="r+")
@@ -185,14 +211,20 @@ def do_filter(*, zarr_path: str, lowcut: float = 300, highcut: float = 6000):
     if filtered_path in z:
         print(f"Filtered data already exists: {filtered_path}")
         return
-    print("Applying bandpass filter to data...")
-    sampling_frequency: float = z.attrs["sampling_frequency"]
+    sampling_frequency = z.attrs["sampling_frequency"]
     raw_array = z["raw"]
     assert isinstance(raw_array, zarr.Array)
     X = raw_array[:]
-    X_filtered = apply_bandpass_filter(
-        X, sampling_frequency=sampling_frequency, lowcut=lowcut, highcut=highcut
-    )
+    if highcut is not None:
+        print("Applying bandpass filter to data...")
+        X_filtered = apply_bandpass_filter(
+            X, sampling_frequency=sampling_frequency, lowcut=lowcut, highcut=highcut
+        )
+    else:
+        print("Applying highpass filter to data...")
+        X_filtered = apply_highpass_filter(
+            X, sampling_frequency=sampling_frequency, lowcut=lowcut
+        )
     print(f'Creating dataset "{filtered_path}" with shape {X_filtered.shape}...')
     z.create_dataset(
         filtered_path,
@@ -527,58 +559,72 @@ if __name__ == "__main__":
         channel_ids=channel_ids,
     )
 
-    do_filter(zarr_path=zarr_path, lowcut=300, highcut=6000)
-
     algs = ["qfc", "qtc"]
     compression_methods = ["zstd", "zlib"]
     target_residual_stdevs = [0, 1, 2, 3, 4, 5, 6, 7, 8]
     zlib_level = 6
     zstd_level = 15
-    lowcut = 300
-    highcut = 6000
 
-    z = open_zarr(zarr_path, mode="r")
-    filtered_path = get_filtered_path(lowcut=lowcut, highcut=highcut)
-    if filtered_path not in z:
-        raise Exception(f"Filtered data not found: {filtered_path}")
-    A = z[filtered_path]
-    assert isinstance(A, zarr.Array)
-    X_filtered = A[:]
+    filt_sets = [
+        {
+            'type': 'highpass',
+            'lowcut': 300,
+        },
+        {
+            'type': 'bandpass',
+            'lowcut': 300,
+            'highcut': 6000
+        }
+    ]
 
-    results = []
-    for alg in algs:
-        for compression_method in compression_methods:
-            for target_resid_stdev in target_residual_stdevs:
-                ds = do_compress(
-                    filtered_data=X_filtered,
-                    zarr_path=zarr_path,
-                    lowcut=lowcut,
-                    highcut=highcut,
-                    alg=alg,
-                    compression_method=compression_method,
-                    target_residual_stdev=target_resid_stdev,
-                    estimate_compression_time=True,
-                    compute_compression_ratio=True,
-                    compute_residual_stdev=True,
-                    zlib_level=zlib_level,
-                    zstd_level=zstd_level,
-                )
-                compression_time_sec = ds.attrs.get("compression_time_sec", None)
-                compression_ratio = ds.attrs.get("compression_ratio", None)
-                resid_stdev = ds.attrs.get("target_residual_stdev", None)
-                results.append(
-                    {
-                        "alg": alg,
-                        "compression_method": compression_method,
-                        "target_residual_stdev": resid_stdev,
-                        "residual_stdev": resid_stdev,
-                        "compression_ratio": compression_ratio,
-                        "compression_time_sec": compression_time_sec,
-                        "lowcut": lowcut,
-                        "highcut": highcut,
-                        "compression_level": zlib_level if compression_method == "zlib" else zstd_level,
-                    }
-                )
+    for filt_set in filt_sets:
+        lowcut = filt_set['lowcut']
+        highcut = filt_set.get('highcut', None)
+
+        do_filter(zarr_path=zarr_path, lowcut=lowcut, highcut=highcut)
+
+        z = open_zarr(zarr_path, mode="r")
+        filtered_path = get_filtered_path(lowcut=lowcut, highcut=highcut)
+        if filtered_path not in z:
+            raise Exception(f"Filtered data not found: {filtered_path}")
+        A = z[filtered_path]
+        assert isinstance(A, zarr.Array)
+        X_filtered = A[:]
+
+        results = []
+        for alg in algs:
+            for compression_method in compression_methods:
+                for target_resid_stdev in target_residual_stdevs:
+                    ds = do_compress(
+                        filtered_data=X_filtered,
+                        zarr_path=zarr_path,
+                        lowcut=lowcut,
+                        highcut=highcut,
+                        alg=alg,
+                        compression_method=compression_method,
+                        target_residual_stdev=target_resid_stdev,
+                        estimate_compression_time=True,
+                        compute_compression_ratio=True,
+                        compute_residual_stdev=True,
+                        zlib_level=zlib_level,
+                        zstd_level=zstd_level,
+                    )
+                    compression_time_sec = ds.attrs.get("compression_time_sec", None)
+                    compression_ratio = ds.attrs.get("compression_ratio", None)
+                    resid_stdev = ds.attrs.get("target_residual_stdev", None)
+                    results.append(
+                        {
+                            "alg": alg,
+                            "compression_method": compression_method,
+                            "target_residual_stdev": resid_stdev,
+                            "residual_stdev": resid_stdev,
+                            "compression_ratio": compression_ratio,
+                            "compression_time_sec": compression_time_sec,
+                            "lowcut": lowcut,
+                            "highcut": highcut,
+                            "compression_level": zlib_level if compression_method == "zlib" else zstd_level,
+                        }
+                    )
 
     # Save results to the zarr store
     save_results_to_store(results, zarr_path)
