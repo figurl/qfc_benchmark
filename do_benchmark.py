@@ -12,6 +12,19 @@ import spikeinterface.extractors as se
 from typing import Any, cast
 from numpy.typing import NDArray
 
+"""
+This script benchmarks the compression of electrophysiology data from NWB files. It includes:
+- **Preprocessing**: Loads NWB data using `spikeinterface`, slices it by duration and channels.
+- **Filtering**: Applies a bandpass filter to isolate desired frequency ranges.
+- **Compression**: Compresses filtered data using QFC/QTC algorithms with zstd/zlib methods,
+  testing various target residual standard deviations and compression levels.
+- **Storage**: Uses Zarr for efficient storage and retrieval, supporting local and S3-based storage.
+- **Metrics**: Evaluates compression time, ratio, and residual accuracy, saving results to JSON.
+
+The script demonstrates a full pipeline, from raw data extraction to filtered compression,
+and outputs benchmark results for further analysis.
+"""
+
 QFCCodec.register_codec()
 QTCCodec.register_codec()
 
