@@ -1,0 +1,8 @@
+numpy
+zarr
+scipy
+qfc
+spikeinterface
+s3fs
+numcodecs
+plotly
