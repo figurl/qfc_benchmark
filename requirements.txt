@@ -1,4 +1,5 @@
 numpy
+remfile
 zarr
 scipy
 qfc
