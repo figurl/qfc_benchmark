@@ -1,13 +1,16 @@
 # %%
 
 import os
-import json
+import requests
 import matplotlib.pyplot as plt
 
 # %%
 
-with open("results.json", "r") as f:
-    results = json.load(f)
+url = 'https://neurosift.org/scratch/qfc_benchmark/test1.zarr/results.json'
+response = requests.get(url)
+results = response.json()
+
+# %%
 
 algs = []
 compression_methods = []
@@ -23,11 +26,6 @@ for r in results:
     if target_residual_stdev not in target_residual_stdevs:
         target_residual_stdevs.append(target_residual_stdev)
 
-
-# Constants
-algs = ["qfc", "qtc"]
-target_residual_stdevs = [x * 0.5 for x in range(1, 15)]
-compression_methods = ["zstd", "zlib"]
 data_directory = "output1"
 output_directory = "plots"
 
