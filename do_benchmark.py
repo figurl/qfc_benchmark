@@ -319,7 +319,7 @@ def do_compress(
                 matches = False
         if matches:
             print(f"Compressed data already exists: {path}")
-            return x
+            return path, x
         else:
             print(f"Compressed data exists but with different parameters: {path}")
             z.__delitem__(path)
@@ -428,7 +428,7 @@ def do_compress(
         ds.attrs["zstd_level"] = zstd_level
     elif compression_method == "zlib":
         ds.attrs["zlib_level"] = zlib_level
-    return ds
+    return path, ds
 
 
 def compute_size_of_zarr_store_excluding_meta(store):
@@ -577,6 +577,7 @@ if __name__ == "__main__":
         }
     ]
 
+    results = []
     for filt_set in filt_sets:
         lowcut = filt_set['lowcut']
         highcut = filt_set.get('highcut', None)
@@ -591,11 +592,10 @@ if __name__ == "__main__":
         assert isinstance(A, zarr.Array)
         X_filtered = A[:]
 
-        results = []
         for alg in algs:
             for compression_method in compression_methods:
                 for target_resid_stdev in target_residual_stdevs:
-                    ds = do_compress(
+                    dataset_path, ds = do_compress(
                         filtered_data=X_filtered,
                         zarr_path=zarr_path,
                         lowcut=lowcut,
@@ -614,6 +614,7 @@ if __name__ == "__main__":
                     resid_stdev = ds.attrs.get("target_residual_stdev", None)
                     results.append(
                         {
+                            "dataset_path": dataset_path,
                             "alg": alg,
                             "compression_method": compression_method,
                             "target_residual_stdev": resid_stdev,
