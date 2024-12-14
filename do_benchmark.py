@@ -294,7 +294,7 @@ def do_compress(
     X = filtered_data
     sampling_frequency = z.attrs["sampling_frequency"]
     segment_length = int(segment_length_sec * sampling_frequency)
-    if target_resid_stdev > 0:
+    if target_residual_stdev > 0:
         if alg == "qfc":
             quant_scale_factor = qfc_estimate_quant_scale_factor(
                 X, target_residual_stdev=target_residual_stdev
@@ -481,6 +481,32 @@ def remove_zarr_store(zarr_path: str):
             shutil.rmtree(zarr_path)
 
 
+def save_results_to_store(results: List[dict], zarr_path: str):
+    """
+    Save results to the zarr store, either locally or in S3.
+
+    Args:
+        results: List of benchmark results
+        zarr_path: Path to zarr store
+    """
+    if zarr_path.startswith("r2://"):
+        import s3fs
+        fs = s3fs.S3FileSystem(
+            key=os.environ.get("AWS_ACCESS_KEY_ID"),
+            secret=os.environ.get("AWS_SECRET_ACCESS_KEY"),
+            endpoint_url=os.environ.get("S3_ENDPOINT_URL"),
+            config_kwargs={"max_pool_connections": 30},
+        )
+        pp = "/".join(zarr_path.split("/")[2:])
+        with fs.open(f"{pp}/results.json", 'w') as f:
+            json.dump(results, f, indent=2)
+    else:
+        # For local storage, save in the zarr directory
+        results_path = os.path.join(zarr_path, "results.json")
+        with open(results_path, 'w') as f:
+            json.dump(results, f, indent=2)
+
+
 if __name__ == "__main__":
     # https://neurosift.app/?p=/nwb&url=https://api.dandiarchive.org/api/assets/c04f6b30-82bf-40e1-9210-34f0bcd8be24/download/&dandisetId=000409&dandisetVersion=draft
     nwb_url = "https://api.dandiarchive.org/api/assets/c04f6b30-82bf-40e1-9210-34f0bcd8be24/download/"
@@ -554,5 +580,5 @@ if __name__ == "__main__":
                     }
                 )
 
-    with open("results.json", "w") as f:
-        json.dump(results, f, indent=2)
+    # Save results to the zarr store
+    save_results_to_store(results, zarr_path)
