@@ -540,92 +540,112 @@ def save_results_to_store(results: List[dict], zarr_path: str):
 
 
 if __name__ == "__main__":
-    # https://neurosift.app/?p=/nwb&url=https://api.dandiarchive.org/api/assets/c04f6b30-82bf-40e1-9210-34f0bcd8be24/download/&dandisetId=000409&dandisetVersion=draft
-    nwb_url = "https://api.dandiarchive.org/api/assets/c04f6b30-82bf-40e1-9210-34f0bcd8be24/download/"
-    electrical_series_path = "/acquisition/ElectricalSeriesAp"
-    duration_sec = 6
-    channel_ids = [f"AP{i}" for i in np.arange(100, 132).tolist()]
-
-    zarr_path = "r2://neurosift/scratch/qfc_benchmark/test1.zarr"
-
-    # uncomment if want to start from scratch
-    # remove_zarr_store(zarr_path)
-
-    initiate_benchmark(
-        zarr_path=zarr_path,
-        nwb_url=nwb_url,
-        electrical_series_path=electrical_series_path,
-        duration_sec=duration_sec,
-        channel_ids=channel_ids,
-    )
-
-    algs = ["qfc", "qtc"]
-    compression_methods = ["zstd", "zlib"]
-    target_residual_stdevs = [0, 1, 2, 3, 4, 5, 6, 7, 8]
-    zlib_level = 6
-    zstd_level = 15
-
-    filt_sets = [
+    datasets = [
         {
-            'type': 'highpass',
-            'lowcut': 300,
+            # https://neurosift.app/?p=/nwb&url=https://api.dandiarchive.org/api/assets/c04f6b30-82bf-40e1-9210-34f0bcd8be24/download/&dandisetId=000409&dandisetVersion=draft
+            'nwb_url': "https://api.dandiarchive.org/api/assets/c04f6b30-82bf-40e1-9210-34f0bcd8be24/download/",
+            'electrical_series_path': "/acquisition/ElectricalSeriesAp",
+            'duration_sec': 6,
+            'channel_ids': [f"AP{i}" for i in np.arange(100, 132).tolist()],
+            'zarr_path': "r2://neurosift/scratch/qfc_benchmark/test1.zarr"
         },
         {
-            'type': 'bandpass',
-            'lowcut': 300,
-            'highcut': 6000
+            # https://neurosift.app/?p=/nwb&dandisetId=000876&dandisetVersion=draft&url=https://api.dandiarchive.org/api/assets/7e1de06d-d478-40e2-9b64-9dd04eafaa4c/download/
+            'nwb_url': "https://api.dandiarchive.org/api/assets/7e1de06d-d478-40e2-9b64-9dd04eafaa4c/download/",
+            "electrical_series_path": "/acquisition/ElectricalSeriesAP",
+            "duration_sec": 6,
+            "channel_ids": [f"AP{i}" for i in np.arange(8, 15).tolist()],
+            'zarr_path': "r2://neurosift/scratch/qfc_benchmark/test2.zarr"
         }
     ]
 
-    results = []
-    for filt_set in filt_sets:
-        lowcut = filt_set['lowcut']
-        highcut = filt_set.get('highcut', None)
+    for i, d in enumerate(datasets):
+        print('=====================')
+        print(f'Processing dataset {i + 1} of {len(datasets)}...')
+        nwb_url = d['nwb_url']
+        electrical_series_path = d['electrical_series_path']
+        duration_sec = d['duration_sec']
+        channel_ids = d['channel_ids']
+        zarr_path = d['zarr_path']
 
-        do_filter(zarr_path=zarr_path, lowcut=lowcut, highcut=highcut)
+        # uncomment if want to start from scratch
+        # remove_zarr_store(zarr_path)
 
-        z = open_zarr(zarr_path, mode="r")
-        filtered_path = get_filtered_path(lowcut=lowcut, highcut=highcut)
-        if filtered_path not in z:
-            raise Exception(f"Filtered data not found: {filtered_path}")
-        A = z[filtered_path]
-        assert isinstance(A, zarr.Array)
-        X_filtered = A[:]
+        initiate_benchmark(
+            zarr_path=zarr_path,
+            nwb_url=nwb_url,
+            electrical_series_path=electrical_series_path,
+            duration_sec=duration_sec,
+            channel_ids=channel_ids,
+        )
 
-        for alg in algs:
-            for compression_method in compression_methods:
-                for target_residual_stdev in target_residual_stdevs:
-                    dataset_path, ds = do_compress(
-                        filtered_data=X_filtered,
-                        zarr_path=zarr_path,
-                        lowcut=lowcut,
-                        highcut=highcut,
-                        alg=alg,
-                        compression_method=compression_method,
-                        target_residual_stdev=target_residual_stdev,
-                        estimate_compression_time=True,
-                        compute_compression_ratio=True,
-                        compute_residual_stdev=True,
-                        zlib_level=zlib_level,
-                        zstd_level=zstd_level,
-                    )
-                    compression_time_sec = ds.attrs.get("compression_time_sec", None)
-                    compression_ratio = ds.attrs.get("compression_ratio", None)
-                    residual_stdev = ds.attrs.get("residual_stdev", None)
-                    results.append(
-                        {
-                            "dataset_path": dataset_path,
-                            "alg": alg,
-                            "compression_method": compression_method,
-                            "target_residual_stdev": target_residual_stdev,
-                            "residual_stdev": residual_stdev,
-                            "compression_ratio": compression_ratio,
-                            "compression_time_sec": compression_time_sec,
-                            "lowcut": lowcut,
-                            "highcut": highcut,
-                            "compression_level": zlib_level if compression_method == "zlib" else zstd_level,
-                        }
-                    )
+        algs = ["qfc", "qtc"]
+        compression_methods = ["zstd", "zlib"]
+        target_residual_stdevs = [0, 1, 2, 3, 4, 5, 6, 7, 8]
+        zlib_level = 6
+        zstd_level = 15
 
-    # Save results to the zarr store
-    save_results_to_store(results, zarr_path)
+        filt_sets = [
+            {
+                'type': 'highpass',
+                'lowcut': 300,
+            },
+            {
+                'type': 'bandpass',
+                'lowcut': 300,
+                'highcut': 6000
+            }
+        ]
+
+        results = []
+        for filt_set in filt_sets:
+            lowcut = filt_set['lowcut']
+            highcut = filt_set.get('highcut', None)
+
+            do_filter(zarr_path=zarr_path, lowcut=lowcut, highcut=highcut)
+
+            z = open_zarr(zarr_path, mode="r")
+            filtered_path = get_filtered_path(lowcut=lowcut, highcut=highcut)
+            if filtered_path not in z:
+                raise Exception(f"Filtered data not found: {filtered_path}")
+            A = z[filtered_path]
+            assert isinstance(A, zarr.Array)
+            X_filtered = A[:]
+
+            for alg in algs:
+                for compression_method in compression_methods:
+                    for target_residual_stdev in target_residual_stdevs:
+                        dataset_path, ds = do_compress(
+                            filtered_data=X_filtered,
+                            zarr_path=zarr_path,
+                            lowcut=lowcut,
+                            highcut=highcut,
+                            alg=alg,
+                            compression_method=compression_method,
+                            target_residual_stdev=target_residual_stdev,
+                            estimate_compression_time=True,
+                            compute_compression_ratio=True,
+                            compute_residual_stdev=True,
+                            zlib_level=zlib_level,
+                            zstd_level=zstd_level,
+                        )
+                        compression_time_sec = ds.attrs.get("compression_time_sec", None)
+                        compression_ratio = ds.attrs.get("compression_ratio", None)
+                        residual_stdev = ds.attrs.get("residual_stdev", None)
+                        results.append(
+                            {
+                                "dataset_path": dataset_path,
+                                "alg": alg,
+                                "compression_method": compression_method,
+                                "target_residual_stdev": target_residual_stdev,
+                                "residual_stdev": residual_stdev,
+                                "compression_ratio": compression_ratio,
+                                "compression_time_sec": compression_time_sec,
+                                "lowcut": lowcut,
+                                "highcut": highcut,
+                                "compression_level": zlib_level if compression_method == "zlib" else zstd_level,
+                            }
+                        )
+
+        # Save results to the zarr store
+        save_results_to_store(results, zarr_path)
