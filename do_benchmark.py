@@ -594,7 +594,7 @@ if __name__ == "__main__":
 
         for alg in algs:
             for compression_method in compression_methods:
-                for target_resid_stdev in target_residual_stdevs:
+                for target_residual_stdev in target_residual_stdevs:
                     dataset_path, ds = do_compress(
                         filtered_data=X_filtered,
                         zarr_path=zarr_path,
@@ -602,7 +602,7 @@ if __name__ == "__main__":
                         highcut=highcut,
                         alg=alg,
                         compression_method=compression_method,
-                        target_residual_stdev=target_resid_stdev,
+                        target_residual_stdev=target_residual_stdev,
                         estimate_compression_time=True,
                         compute_compression_ratio=True,
                         compute_residual_stdev=True,
@@ -611,14 +611,14 @@ if __name__ == "__main__":
                     )
                     compression_time_sec = ds.attrs.get("compression_time_sec", None)
                     compression_ratio = ds.attrs.get("compression_ratio", None)
-                    resid_stdev = ds.attrs.get("target_residual_stdev", None)
+                    residual_stdev = ds.attrs.get("residual_stdev", None)
                     results.append(
                         {
                             "dataset_path": dataset_path,
                             "alg": alg,
                             "compression_method": compression_method,
-                            "target_residual_stdev": resid_stdev,
-                            "residual_stdev": resid_stdev,
+                            "target_residual_stdev": target_residual_stdev,
+                            "residual_stdev": residual_stdev,
                             "compression_ratio": compression_ratio,
                             "compression_time_sec": compression_time_sec,
                             "lowcut": lowcut,
