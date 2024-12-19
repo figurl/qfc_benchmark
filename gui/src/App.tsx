@@ -276,6 +276,10 @@ const CompressionRatioVsResidualStdevPlot: FunctionComponent<
     }
   }
 
+  const maxCompressionRatio = Math.max(
+    ...results.map((r) => r.compression_ratio)
+  );
+
   const layout = {
     width: width,
     height: 400,
@@ -285,6 +289,8 @@ const CompressionRatioVsResidualStdevPlot: FunctionComponent<
     },
     yaxis: {
       title: "Compression Ratio",
+      type: "log",
+      tickvals: [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000].filter(v => v <= maxCompressionRatio),
     },
   };
 
@@ -390,7 +396,7 @@ const useResults = () => {
     return () => {
       canceled = true;
     };
-  }, []);
+  }, [url]);
   return results;
 };
 

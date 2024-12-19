@@ -316,15 +316,28 @@ def do_compress(
         assert isinstance(x, zarr.Array)
         matches = True
         if alg == "qfc" and target_residual_stdev > 0:
-            if x.attrs["segment_length_sec"] != segment_length_sec:
+            if x.attrs.get("segment_length_sec", None) != segment_length_sec:
                 matches = False
         if alg in qwc_algs and target_residual_stdev > 0:
             if x.attrs.get("segment_length_sec", None) != segment_length_sec:
                 matches = False
             if x.attrs.get("residual_stdev", None) is None:
                 matches = False
+        if not x.attrs.get("compression_time_sec", None):
+            matches = False
+        if not x.attrs.get("decompression_time_sec", None):
+            matches = False
         if matches:
             print(f"Compressed data already exists: {path}")
+            # one-off recompute residual stdev
+            if compute_residual_stdev:
+                print("Recomputing residual stdev...")
+                X = filtered_data
+                X_compressed = x[:]
+                residual = X - X_compressed
+                residual_stdev = np.std(residual)
+                x.attrs["residual_stdev"] = residual_stdev
+                print(f"Residual stdev: {residual_stdev:.4f}")
             return path, x
         else:
             print(f"Compressed data exists but with different parameters: {path}")
@@ -404,7 +417,8 @@ def do_compress(
     )
     if estimate_compression_time:
         print("Estimating compression time...")
-        elapsed_times = []
+        elapsed_compression_times = []
+        elapsed_decompression_times = []
         for i in range(3):
             memory_store = zarr.MemoryStore()
             z_memory = zarr.open(store=memory_store, mode="w")
@@ -416,10 +430,17 @@ def do_compress(
                 compressor=codec,
                 chunks=get_chunks_for_shape(X.shape),  # type: ignore
             )
-            elapsed_times.append(time.time() - timer)
-        elapsed = np.mean(elapsed_times)
-        ds.attrs["compression_time_sec"] = elapsed
-        print(f"Estimated compression time: {elapsed:.4f} sec")
+            elapsed_compression_times.append(time.time() - timer)
+            timer = time.time()
+            tmp = z_memory["tmp"][:]
+            assert isinstance(tmp, np.ndarray)
+            elapsed_decompression_times.append(time.time() - timer)
+        elapsed_compression = np.mean(elapsed_compression_times)
+        ds.attrs["compression_time_sec"] = elapsed_compression
+        print(f"Estimated compression time: {elapsed_compression:.4f} sec")
+        elapsed_decompression = np.mean(elapsed_decompression_times)
+        ds.attrs["decompression_time_sec"] = elapsed_decompression
+        print(f"Estimated decompression time: {elapsed_decompression:.4f} sec")
     if compute_compression_ratio or compute_residual_stdev:
         print("Computing compression ratio...")
         memory_store = zarr.MemoryStore()
@@ -432,9 +453,9 @@ def do_compress(
             chunks=get_chunks_for_shape(X.shape),  # type: ignore
         )
         if compute_compression_ratio:
-            X_total_bytes = X.size * X.itemsize
+            X_total_bytes = int(X.nbytes)  # type: ignore
             compressed_bytes = compute_size_of_zarr_store_excluding_meta(memory_store)
-            compression_ratio = X_total_bytes / compressed_bytes
+            compression_ratio = X_total_bytes * 1.0 / compressed_bytes
             ds.attrs["compression_ratio"] = compression_ratio
             print(f"Compression ratio: {compression_ratio:.4f}")
         if compute_residual_stdev:
@@ -612,7 +633,7 @@ if __name__ == "__main__":
 
         algs = ["qfc", "qtc", "db4"]
         compression_methods = ["zstd", "zlib"]
-        target_residual_stdevs = [0, 1, 2, 3, 4, 5, 6, 7, 8]
+        target_residual_stdevs = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
         zlib_level = 6
         zstd_level = 15
 
