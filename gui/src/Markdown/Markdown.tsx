@@ -2,8 +2,8 @@
 // import "katex/dist/katex.min.css";
 import { FunctionComponent, useMemo, useState } from "react";
 import { ReactMarkdown } from "react-markdown/lib/react-markdown";
-import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import { darcula as highlighterStyle } from "react-syntax-highlighter/dist/esm/styles/prism";
+// import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+// import { darcula as highlighterStyle } from "react-syntax-highlighter/dist/esm/styles/prism";
 // import rehypeKatexPlugin from 'rehype-katex';
 import { Hyperlink, SmallIconButton } from "@fi-sci/misc";
 import { CopyAll, PlayArrow } from "@mui/icons-material";
@@ -76,13 +76,14 @@ const Markdown: FunctionComponent<Props> = ({
                 </span>
               )}
             </div>
-            <SyntaxHighlighter
+            Disabled syntax highlighter for now
+            {/* <SyntaxHighlighter
               children={String(children).replace(/\n$/, "")}
               style={highlighterStyle as any}
               language={match[1]}
               PreTag="div"
               {...props}
-            />
+            /> */}
           </>
         ) : (
           <code className={className} {...props}>

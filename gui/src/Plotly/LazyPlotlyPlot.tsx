@@ -8,7 +8,7 @@ import React, {
 } from "react";
 import { useInView } from "react-intersection-observer";
 
-const Plot = React.lazy(() => import("react-plotly.js"));
+const Plot = React.lazy(() => import("react-plotly.js") as any);
 
 type Props = {
   data: any;
