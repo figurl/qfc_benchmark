@@ -7,3 +7,4 @@ spikeinterface
 s3fs
 numcodecs
 plotly
+PyWavelets

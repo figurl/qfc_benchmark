@@ -1,4 +1,6 @@
+output1
 tmp
+*.zarr
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

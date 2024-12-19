@@ -6,8 +6,8 @@ import zarr
 import os
 import shutil
 from scipy.signal import butter, lfilter
-from qfc.codecs import QFCCodec, QTCCodec
-from qfc import qfc_estimate_quant_scale_factor, qtc_estimate_quant_scale_factor
+from qfc.codecs import QFCCodec, QTCCodec, QWCCodec
+from qfc import qfc_estimate_quant_scale_factor, qtc_estimate_quant_scale_factor, qwc_estimate_quant_scale_factor
 import spikeinterface.extractors as se
 from typing import Any, cast
 from numpy.typing import NDArray
@@ -27,7 +27,10 @@ and outputs benchmark results for further analysis.
 
 QFCCodec.register_codec()
 QTCCodec.register_codec()
+QWCCodec.register_codec()
 
+
+qwc_algs = ["db4", "db8", "haar"]
 
 # Signal Processing
 def apply_bandpass_filter(
@@ -312,10 +315,13 @@ def do_compress(
         x = z[path]
         assert isinstance(x, zarr.Array)
         matches = True
-        if alg == "qfc" and target_residual_stdev == 0:
-            matches = False
         if alg == "qfc" and target_residual_stdev > 0:
             if x.attrs["segment_length_sec"] != segment_length_sec:
+                matches = False
+        if alg in qwc_algs and target_residual_stdev > 0:
+            if x.attrs.get("segment_length_sec", None) != segment_length_sec:
+                matches = False
+            if x.attrs.get("residual_stdev", None) is None:
                 matches = False
         if matches:
             print(f"Compressed data already exists: {path}")
@@ -347,6 +353,29 @@ def do_compress(
             codec = QTCCodec(
                 quant_scale_factor=quant_scale_factor,
                 dtype="int16",
+                compression_method=compression_method,  # type: ignore
+                zstd_level=zstd_level,
+                zlib_level=zlib_level,
+            )
+        elif alg in qwc_algs:
+            pywt_wavelet = alg
+            pywt_level = 4
+            pywt_mode = 'symmetric'
+            quant_scale_factor = qwc_estimate_quant_scale_factor(
+                X,
+                pywt_wavelet=pywt_wavelet,
+                pywt_level=pywt_level,
+                pywt_mode=pywt_mode,
+                segment_length=segment_length,
+                target_residual_stdev=target_residual_stdev
+            )
+            codec = QWCCodec(
+                quant_scale_factor=quant_scale_factor,
+                dtype="int16",
+                segment_length=segment_length,
+                pywt_wavelet=pywt_wavelet,
+                pywt_level=pywt_level,
+                pywt_mode=pywt_mode,
                 compression_method=compression_method,  # type: ignore
                 zstd_level=zstd_level,
                 zlib_level=zlib_level,
@@ -418,6 +447,8 @@ def do_compress(
             print(f"Residual stdev: {residual_stdev:.4f}")
 
     if alg == "qfc" and target_residual_stdev > 0:
+        ds.attrs["segment_length_sec"] = segment_length_sec
+    if alg in qwc_algs and target_residual_stdev > 0:
         ds.attrs["segment_length_sec"] = segment_length_sec
     ds.attrs["lowcut"] = lowcut
     ds.attrs["highcut"] = highcut
@@ -559,7 +590,7 @@ if __name__ == "__main__":
         }
     ]
 
-    for i, d in enumerate(datasets):
+    for i, d in enumerate(datasets[:1]):
         print('=====================')
         print(f'Processing dataset {i + 1} of {len(datasets)}...')
         nwb_url = d['nwb_url']
@@ -579,7 +610,7 @@ if __name__ == "__main__":
             channel_ids=channel_ids,
         )
 
-        algs = ["qfc", "qtc"]
+        algs = ["qfc", "qtc", "db4"]
         compression_methods = ["zstd", "zlib"]
         target_residual_stdevs = [0, 1, 2, 3, 4, 5, 6, 7, 8]
         zlib_level = 6
