@@ -682,6 +682,7 @@ if __name__ == "__main__":
                             zstd_level=zstd_level,
                         )
                         compression_time_sec = ds.attrs.get("compression_time_sec", None)
+                        decompression_time_sec = ds.attrs.get("decompression_time_sec", None)
                         compression_ratio = ds.attrs.get("compression_ratio", None)
                         residual_stdev = ds.attrs.get("residual_stdev", None)
                         results.append(
@@ -693,6 +694,7 @@ if __name__ == "__main__":
                                 "residual_stdev": residual_stdev,
                                 "compression_ratio": compression_ratio,
                                 "compression_time_sec": compression_time_sec,
+                                "decompression_time_sec": decompression_time_sec,
                                 "lowcut": lowcut,
                                 "highcut": highcut,
                                 "compression_level": zlib_level if compression_method == "zlib" else zstd_level,

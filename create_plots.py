@@ -91,6 +91,7 @@ for filt_set in filt_sets:
                 plt.plot(residual_stdevs, compression_ratios, label=label, marker="o")
     plt.xlabel("Residual Stdev")
     plt.ylabel("Compression Ratio")
+    plt.yscale("log")
     plt.legend()
     plt.title(f"{label_for_filter(filt_set)}")
     plt.show()
