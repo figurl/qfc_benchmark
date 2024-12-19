@@ -46,7 +46,7 @@ type Selection = {
 const defaultSelection: Selection = {
   alg: "qfc",
   filtSet: "300-6000",
-  targetResidualStdev: 1,
+  targetResidualStdev: 4,
   compressionMethod: "zlib",
 };
 
@@ -423,16 +423,6 @@ const TracePlot: FunctionComponent<TracePlotProps> = ({
       r.alg === alg
     );
   });
-  console.log(
-    "--- aaa",
-    result,
-    lowcut,
-    highcut,
-    targetResidualStdev,
-    compressionMethod,
-    alg
-  );
-  console.log('---- results', results);
   if (!result) {
     return <div>No results found for selected parameters</div>;
   }
@@ -518,22 +508,31 @@ const TracePlotChild: FunctionComponent<TracePlotChildProps> = ({
     ttF.push(ii / 32);
     ddF.push(filteredData[ii]);
   }
+  const xAxisLabel = "Timepoint";
+  const yAxisLabel = "Amplitude";
   const data = [
     {
       x: tt,
       y: dd,
       type: "scatter",
+      name: "Compressed",
     },
     {
       x: ttF,
       y: ddF,
       type: "scatter",
+      name: "Original",
     },
   ];
   const layout = {
     width: width,
-    height: 400,
-    title: "Compressed data",
+    height: 500,
+    xaxis: {
+      title: xAxisLabel,
+    },
+    yaxis: {
+      title: yAxisLabel,
+    }
   };
   return <LazyPlotlyPlot data={data} layout={layout} />;
 };

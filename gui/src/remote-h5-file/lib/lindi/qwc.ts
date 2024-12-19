@@ -252,8 +252,6 @@ const qwc_inv_pre_compress = async (o: {
     }
   }
 
-  console.log('--- test')
-
   if (dtype === "int16") {
     const ret2 = new Int16Array(ret.length);
     for (let i = 0; i < ret.length; i++) {
