@@ -98,7 +98,7 @@ for filt_set in filt_sets:
 
 # %%
 
-# Compression time vs residual stdev for QFC-zlib, QFC-zstd, QTC-zlib, QTC-zstd
+# Compression time vs residual stdev for various algorithms and compression methods
 plt.figure(figsize=(6, 4))
 for filt_set in filt_sets:
     p = filt_set.split("-")
@@ -132,9 +132,10 @@ for filt_set in filt_sets:
     plt.legend()
     plt.title(f"{label_for_filter(filt_set)}")
     plt.show()
+
 # %%
 
-# Compression ratio vs compression time for QFC-zlib, QFC-zstd, QTC-zlib, QTC-zstd
+# Decompression time vs residual stdev for various algorithms and compression methods
 plt.figure(figsize=(6, 4))
 for filt_set in filt_sets:
     p = filt_set.split("-")
@@ -152,20 +153,21 @@ for filt_set in filt_sets:
                 and r["lowcut"] == lowcut
                 and r.get("highcut", None) == highcut
             ]
-            # Sort by compression_ratio to ensure proper line plotting
-            filtered_results.sort(key=lambda x: x["compression_ratio"])
+            # Sort by residual_stdev to ensure proper line plotting
+            filtered_results.sort(key=lambda x: x["residual_stdev"])
 
             if filtered_results:
                 label = f"{alg}-{compression}"
-                compression_ratios = [r["compression_ratio"] for r in filtered_results]
-                compression_times = [
-                    r["compression_time_sec"] for r in filtered_results
+                residual_stdevs = [r["residual_stdev"] for r in filtered_results]
+                decompression_times = [
+                    r["decompression_time_sec"] for r in filtered_results
                 ]
-                plt.plot(compression_ratios, compression_times, label=label, marker="o")
+                plt.plot(residual_stdevs, decompression_times, label=label, marker="o")
 
-    plt.xlabel("Compression ratio")
-    plt.ylabel("Compression Time (s)")
+    plt.xlabel("Residual Stdev")
+    plt.ylabel("Decompression Time (s)")
     plt.legend()
     plt.title(f"{label_for_filter(filt_set)}")
     plt.show()
+
 # %%
